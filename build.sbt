@@ -11,5 +11,7 @@ libraryDependencies ++= Seq(
   "io.spray" %% "spray-can" % "1.3.+",
   "io.spray" %% "spray-client" % "1.3.+",
   "io.spray" %% "spray-json" % "1.3.+",
-  "mysql"         % "mysql-connector-java" % "5.1.24"
+  "mysql"         % "mysql-connector-java" % "5.1.24",
+  "joda-time" % "joda-time" % "2.8.1",
+  "com.github.nscala-time" %% "nscala-time" % "2.0.0"
 )

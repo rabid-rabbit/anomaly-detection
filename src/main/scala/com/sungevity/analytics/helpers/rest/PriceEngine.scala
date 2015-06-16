@@ -16,9 +16,7 @@ object PriceEngine {
 
   import com.sungevity.analytics.helpers.rest.protocols.PriceEngine._
 
-  def monthlyKwh(installation: PERequest[Account]): PEResponse[Seq[ProductionEstimation]] = {
-
-    implicit val system = ActorSystem()
+  def monthlyKwh(installation: PERequest[Account])(implicit actorSystem: ActorSystem): PEResponse[Seq[ProductionEstimation]] = {
 
     val pipeline: HttpRequest => Future[PEResponse[Seq[ProductionEstimation]]] = sendReceive ~> unmarshal[PEResponse[Seq[ProductionEstimation]]]
 

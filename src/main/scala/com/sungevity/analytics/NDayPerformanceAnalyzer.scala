@@ -1,13 +1,33 @@
 package com.sungevity.analytics
 
+import akka.actor.ActorSystem
 import com.sungevity.analytics.helpers.rest.PriceEngine
 import com.sungevity.analytics.helpers.sql.{Queries, ConnectionStrings}
 import com.sungevity.analytics.model._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkContext, SparkConf}
 
+import org.joda.time.DateTime
+import com.github.nscala_time.time.Imports._
+
 
 object NDayPerformanceAnalyzer extends App {
+
+  implicit val system = ActorSystem()
+
+  def help() {
+    println(s"${this.getClass.getSimpleName} <nDays> <nearestNeighbours>")
+  }
+
+  if(args.size < 2) {
+    println("Please specify number of days and number of nearest neighbours.")
+    help()
+    sys.exit(1)
+  }
+
+  val nDays = args(0).toInt
+
+  val nearestNeighbours = args(1).toInt
 
   val conf = new SparkConf().setAppName("NDayPerformanceAnalyzer")
   val sc = new SparkContext(conf)
@@ -63,13 +83,46 @@ object NDayPerformanceAnalyzer extends App {
 
   val groupedAccounts = accounts.groupBy(account => account.accountID).map( group => group._2.reduce((a, b) => a + b))
 
-  val result = groupedAccounts.map {
+  val monthlyKwh = groupedAccounts.map {
     account =>
 
       PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account))
 
   }
 
-  println(result.take(1).toList)
+  val startDate = DateTime.now
+  val endDate = startDate + nDays.days
+
+  def dateRange(from: DateTime, to: DateTime, step: Period): Iterator[DateTime] = Iterator.iterate(from)(_.plus(step)).takeWhile(!_.isAfter(to))
+
+  val result = monthlyKwh.map {
+    installations =>
+
+      installations.response flatMap {
+        estimate =>
+
+          dateRange(startDate, endDate, new Period().withDays(1)) map {
+
+            day =>
+
+              def avgMonthlyKWh(month: DateTime.Property) = estimate.monthlyOutput(month.get - 1) / month.getMaximumValue
+
+              val dayAvgKwh = (avgMonthlyKWh((day - 15.days).monthOfYear()) * 15 + avgMonthlyKWh((day + 15.days).monthOfYear()) * 15) / 30
+
+              (estimate.id -> dayAvgKwh)
+
+          }
+
+      } groupBy(_._1) map {
+        v => (v._1 -> v._2.map(_._2))
+      }
+
+  }
+
+  println(result.take(10).mkString("\n"))
+
+  sc.stop()
+
+  system.shutdown()
 
 }
