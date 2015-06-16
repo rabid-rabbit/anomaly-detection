@@ -10,6 +10,8 @@ if [ "$#" -ne 3 ]; then
  exit 1
 fi
 
+BASEDIR=$(dirname $0)
+
 if [ "x$1" == "xlocal" ]; then
- sbt -Dspark.master=local "run $2 $3"
+ (cd $BASEDIR; sbt -Dspark.master=local "run $2 $3")
 fi
