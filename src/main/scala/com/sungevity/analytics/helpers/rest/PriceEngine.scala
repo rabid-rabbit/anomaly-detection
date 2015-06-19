@@ -18,9 +18,13 @@ object PriceEngine {
 
   def monthlyKwh(installation: PERequest[Account])(implicit actorSystem: ActorSystem): PEResponse[Seq[ProductionEstimation]] = {
 
-    val pipeline: HttpRequest => Future[PEResponse[Seq[ProductionEstimation]]] = sendReceive ~> unmarshal[PEResponse[Seq[ProductionEstimation]]]
+//    println(s"getting estimates for ${installation.data.accountID}")
 
-    Await result (pipeline(Post("http://brsf.sungevity.com", installation)), 10 seconds)
+    PEResponse(Seq(ProductionEstimation(installation.data.installations.head.systemID, 1034, Seq(42, 55, 80, 105, 126, 127, 133, 116, 94, 72, 48, 37), Seq.empty, None)))
+
+//    val pipeline: HttpRequest => Future[PEResponse[Seq[ProductionEstimation]]] = sendReceive ~> unmarshal[PEResponse[Seq[ProductionEstimation]]]
+//
+//    Await result (pipeline(Post("http://brsf.sungevity.com", installation)), 10 seconds)
 
   }
 

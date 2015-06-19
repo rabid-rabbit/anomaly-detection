@@ -22,6 +22,10 @@ object NDayPerformanceAnalyzer extends App {
 
   def dateRange(from: DateTime, to: DateTime, step: Period): Iterator[DateTime] = Iterator.iterate(from)(_.plus(step)).takeWhile(!_.isAfter(to))
 
+  def toMap(dFrame: DataFrame) = dFrame.map(v => v.schema.fieldNames.zip(v.toSeq).toMap)
+
+  def formatRows(dFrame: DataFrame) = dFrame.take(2).map(v => v.schema.fieldNames.zip(v.toSeq).toMap).mkString("\n")
+
   if(args.size < 2) {
     println("Please specify number of days and number of nearest neighbours.")
     help()
@@ -44,11 +48,19 @@ object NDayPerformanceAnalyzer extends App {
 
   import sqlContext.implicits._
 
-  val accountsSystemsData = sqlContext.load("jdbc", Map(
+  val allSystemsData = sqlContext.load("jdbc", Map(
     "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.allSystems}) as all_systems")).persist
+    "dbtable" -> s"(${Queries.allSystems}) as all_systems"))
 
-  val accounts = accountsSystemsData.map {
+  val systemData =  sqlContext.load("jdbc", Map(
+    "url" -> ConnectionStrings.local,
+    "dbtable" -> s"(${Queries.systemData}) as system_data"))
+
+  val productionData =  sqlContext.load("jdbc", Map(
+    "url" -> ConnectionStrings.local,
+    "dbtable" -> s"(${Queries.productionData(DateTime.now - 20.days, DateTime.now - 10.days)}) as production_data"))
+
+  val accounts = allSystemsData.map {
     row =>
 
       val location = Location(row.getString(1), "", row.getString(2).toDouble, row.getString(3).toDouble)
@@ -92,17 +104,19 @@ object NDayPerformanceAnalyzer extends App {
 
   val groupedAccounts = accounts.groupBy(account => account.accountID).map( group => group._2.reduce((a, b) => a + b))
 
-  val monthlyKwh = groupedAccounts.map {
+  val estimatedMonthlyKwh = groupedAccounts.map {
     account =>
 
-      PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account))
+      val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account))
+
+      (account -> result.response)
 
   }
 
-  val dailyKwh = monthlyKwh.map {
-    installations =>
+  val estimatedDailyKwh = estimatedMonthlyKwh map {
+    estimates =>
 
-      installations.response flatMap {
+      val dailyEstimates = estimates._2 flatMap {
         estimate =>
 
           dateRange(startDate, endDate, new Period().withDays(1)) map {
@@ -111,26 +125,19 @@ object NDayPerformanceAnalyzer extends App {
 
               def avgMonthlyKWh(month: DateTime.Property) = estimate.monthlyOutput(month.get - 1) / month.getMaximumValue
 
-              val dayAvgKwh = (avgMonthlyKWh((day - 15.days).monthOfYear()) * 15 + avgMonthlyKWh((day + 15.days).monthOfYear()) * 15) / 30
+              val dayAvgKwh = ((avgMonthlyKWh((day - 15.days).monthOfYear()) * 15 + avgMonthlyKWh((day + 15.days).monthOfYear()) * 15) / 30) toDouble
 
               (estimate.id -> dayAvgKwh)
 
           }
 
-      } groupBy(_._1) map {
-        v => (v._1 -> v._2.map(_._2))
+      } groupBy(_._1) flatMap {
+        v => v._2.map(_._2)
       }
 
-  }
+      (estimates._1 -> dailyEstimates)
 
-  val systemData =  sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.systemData}) as system_data"))
-
-
-  val productionData =  sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.productionData(DateTime.now - 20.days, DateTime.now - 10.days)}) as production_data"))
+  } persist
 
   val reports = systemData.join(productionData, productionData("accountNumber") === systemData("accountNumber"), "inner") map {
     row =>
@@ -145,14 +152,14 @@ object NDayPerformanceAnalyzer extends App {
 
       val productionData = ProductionData(row.getString(byName("accountNumber")), new DateTime(row.get(byName("readingDate"))), row.getDouble(byName("reading")))
 
-      Report(account, row.getString(byName("pgVoid")), row.getString(byName("openCase")), 0.0, row.getString(byName("pgNotes")), List(productionData), new DateTime(row.get(byName("interconnectionDate"))), row.getDouble(byName("actualKwh")), 0.0, 0.0, 0, false)
+      Report(account, row.getString(byName("pgVoid")), row.getString(byName("openCase")), row.getString(byName("pgNotes")), List(productionData), new DateTime(row.get(byName("interconnectionDate"))), row.getDouble(byName("actualKwh")))
 
   }
 
   val groupedReports = reports.groupBy(r => r.account) map {
     group =>
 
-      group._2 reduce {
+      val reports = group._2 reduce {
         (a, b) =>
           val readings = a.readings ++ b.readings
           val readingsMap = readings.map(_.readingDate.getDayOfMonth -> 0).toMap
@@ -164,13 +171,32 @@ object NDayPerformanceAnalyzer extends App {
           )
       }
 
+      (group._1 -> reports)
+
+  } persist
+
+  val reportsWithEstimatedDailyKwh = groupedReports.join(estimatedDailyKwh) map {
+    entry =>
+
+      val estimatedDailyKwh = entry._2._2
+      val report = entry._2._1.copy(
+        performanceRatio = entry._2._1.sum / estimatedDailyKwh.sum,
+        estimatedReadings = estimatedDailyKwh.toSeq,
+        estimatedKwh = estimatedDailyKwh.sum)
+      val account = entry._1
+
+      (account -> report)
+  } persist
+
+  val nn = for{
+    report <- reportsWithEstimatedDailyKwh.take(5)
+    location = report._1.location
+    nn = reportsWithEstimatedDailyKwh.sortBy(v => location.haversineDistance(v._1.location)).take(nearestNeighbours)
+  } yield {
+    (report._1 -> nn.map(_._1.location).toList)
   }
 
-  def toMap(dFrame: DataFrame) = dFrame.map(v => v.schema.fieldNames.zip(v.toSeq).toMap)
-
-  def formatRows(dFrame: DataFrame) = dFrame.take(2).map(v => v.schema.fieldNames.zip(v.toSeq).toMap).mkString("\n")
-
-  println(groupedReports.take(2).mkString("\n"))
+  println(nn.mkString("\n"))
 
   sc.stop()
 

@@ -89,7 +89,11 @@ object PriceEngine extends DefaultJsonProtocol {
 
               case Seq(JsArray(systems)) => systems.map(_.convertTo[ProductionEstimation])
 
+              case _ => Seq.empty
+
             }
+
+          case _ => Seq.empty
 
         }
 
