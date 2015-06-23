@@ -21,7 +21,7 @@ local <number_of_days> <number_of_neighbours> <output_file>|remote <spark-master
 There are 2 modes for running the program: _remote_ and _local_. In _remote_ mode you'll need a [Spark](https://spark.apache.org/) cluster. For _local_ mode all you need is _SBT_:
 
 ```bash
-$ ./run.sh local 10 50 /tmp/n-day final out.csv
+$ ./run.sh local 10 50 /tmp/n-day-final.csv
 ...
 15/06/23 16:05:00 INFO MemoryStore: MemoryStore cleared
 15/06/23 16:05:00 INFO BlockManager: BlockManager stopped
