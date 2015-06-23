@@ -15,24 +15,23 @@ To run the tool use _run.sh_ script that can be found at the root directory of t
 
 ```bash
 $ ./run.sh
-local|remote <number_of_days> <number_of_neighbours>
+local <number_of_days> <number_of_neighbours> <output_file>|remote <spark-master-url> <number_of_days> <number_of_neighbours> <output_file>
 ```
 
 There are 2 modes for running the program: _remote_ and _local_. In _remote_ mode you'll need a [Spark](https://spark.apache.org/) cluster. For _local_ mode all you need is _SBT_:
 
 ```bash
-$ ./run.sh local 10 50
+$ ./run.sh local 10 50 /tmp/n-day final out.csv
 ...
-Map(a1IU00000012DAcMAM -> Vector(68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68))
-Map(a1IU000000126NDMAY -> Vector(58, 58, 58, 58, 58, 58, 58, 58, 58, 58, 58, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32))
-Map(a1IU000000121kuMAA -> Vector(79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79))
-Map(a1IU000000121jYMAQ -> Vector(39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44))
-Map(a1IU000000121jiMAA -> Vector(57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57))
-Map(a1IU00000012AWVMA2 -> Vector(27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40))
-Map(a1IU0000001280TMAQ -> Vector(34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37))
-Map(a1IU000000125b4MAA -> Vector(85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85))
-Map(a1IU00000050WxXMAU -> Vector(48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48))
-Map(a1IU000000128yxMAA -> Vector(74, 74, 74, 74, 74, 74, 74, 74, 74, 74, 74, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16))
+15/06/23 16:05:00 INFO MemoryStore: MemoryStore cleared
+15/06/23 16:05:00 INFO BlockManager: BlockManager stopped
+15/06/23 16:05:00 INFO BlockManagerMaster: BlockManagerMaster stopped
+15/06/23 16:05:00 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+15/06/23 16:05:00 INFO SparkContext: Successfully stopped SparkContext
+15/06/23 16:05:00 INFO Utils: Shutdown hook called
+15/06/23 16:05:00 INFO Utils: Deleting directory /private/var/folders/b8/yf4pgvkd5z76gj36n7n1x4z80000gp/T/spark-23da851b-fe61-4381-b67d-238f8ddaadbe
+15/06/23 16:05:00 INFO RemoteActorRefProvider$RemotingTerminator: Shutting down remote daemon.
+15/06/23 16:05:00 INFO RemoteActorRefProvider$RemotingTerminator: Remote daemon shut down; proceeding with flushing remote transports.
 ```
 
 
