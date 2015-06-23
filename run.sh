@@ -10,8 +10,14 @@ if [ "$#" -ne 3 ]; then
  exit 1
 fi
 
+SPARK_HOME
+
 BASEDIR=$(dirname $0)
 
 if [ "x$1" == "xlocal" ]; then
+ (cd $BASEDIR; sbt -Dspark.master=local "run $2 $3")
+fi
+
+if [ "x$1" == "xremote" ]; then
  (cd $BASEDIR; sbt -Dspark.master=local "run $2 $3")
 fi

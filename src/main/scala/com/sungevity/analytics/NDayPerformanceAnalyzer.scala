@@ -1,9 +1,12 @@
 package com.sungevity.analytics
 
 import akka.actor.ActorSystem
+import breeze.linalg.DenseVector
+import com.sungevity.analytics.helpers.Date._
 import com.sungevity.analytics.helpers.rest.PriceEngine
 import com.sungevity.analytics.helpers.sql.{Queries, ConnectionStrings}
 import com.sungevity.analytics.model._
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.{SparkContext, SparkConf}
 import org.apache.spark.sql.functions._
@@ -11,6 +14,7 @@ import org.apache.spark.sql.functions._
 import org.joda.time.DateTime
 import com.github.nscala_time.time.Imports._
 
+import utils.Statistics._
 
 object NDayPerformanceAnalyzer extends App {
 
@@ -32,15 +36,23 @@ object NDayPerformanceAnalyzer extends App {
     sys.exit(1)
   }
 
-  val nDays = args(0).toInt
+  val nDays = 10
 
-  val nearestNeighbours = args(1).toInt
+  val nearestNeighbours = 50
 
-  val startDate = DateTime.now
+  println(nDays)
 
-  val endDate = startDate + nDays.days
+  println(nearestNeighbours)
 
-  val days = dateRange(startDate, endDate, new Period().withDays(1))
+  def startDate = DateTime.now
+
+  def endDate = startDate + nDays.days
+
+  println(startDate)
+
+  println(endDate)
+
+  def days = dateRange(startDate, endDate, new Period().withDays(1))
 
   val conf = new SparkConf().setAppName("NDayPerformanceAnalyzer")
   val sc = new SparkContext(conf)
@@ -50,15 +62,18 @@ object NDayPerformanceAnalyzer extends App {
 
   val allSystemsData = sqlContext.load("jdbc", Map(
     "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.allSystems}) as all_systems"))
+    "dbtable" -> s"(${Queries.allSystems}) as all_systems",
+    "driver" -> "com.mysql.jdbc.Driver"))
 
   val systemData =  sqlContext.load("jdbc", Map(
     "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.systemData}) as system_data"))
+    "dbtable" -> s"(${Queries.systemData}) as system_data",
+    "driver" -> "com.mysql.jdbc.Driver"))
 
   val productionData =  sqlContext.load("jdbc", Map(
     "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.productionData(DateTime.now - 20.days, DateTime.now - 10.days)}) as production_data"))
+    "dbtable" -> s"(${Queries.productionData(DateTime.now - 20.days, DateTime.now - 10.days)}) as production_data",
+    "driver" -> "com.mysql.jdbc.Driver"))
 
   val accounts = allSystemsData.map {
     row =>
@@ -137,7 +152,7 @@ object NDayPerformanceAnalyzer extends App {
 
       (estimates._1 -> dailyEstimates)
 
-  } persist
+  }
 
   val reports = systemData.join(productionData, productionData("accountNumber") === systemData("accountNumber"), "inner") map {
     row =>
@@ -159,24 +174,27 @@ object NDayPerformanceAnalyzer extends App {
   val groupedReports = reports.groupBy(r => r.account) map {
     group =>
 
+      println(s"groupedReports ${group._1}")
+
       val reports = group._2 reduce {
         (a, b) =>
           val readings = a.readings ++ b.readings
-          val readingsMap = readings.map(_.readingDate.getDayOfMonth -> 0).toMap
           a.copy(
             readings = readings,
-            sum = readings.foldLeft(0.0)((v, r) => v + r.reading),
-            hasSmallValues = readings.foldLeft(false)((v, r) => v || r.reading <= 1),
-            blanksCount = days.foldLeft(0)((r, v) => r + readingsMap.get(v.getDayOfMonth).getOrElse(1))
+            sum = readings.map(_.reading).sum,
+            blanksCount = days.length - readings.length,
+            smallValuesCount = readings.map(v => if (v.reading <= 1) 1 else 0).sum
           )
       }
 
       (group._1 -> reports)
 
-  } persist
+  }
 
   val reportsWithEstimatedDailyKwh = groupedReports.join(estimatedDailyKwh) map {
     entry =>
+
+      println(s"reportsWithEstimatedDailyKwh ${entry._1}")
 
       val estimatedDailyKwh = entry._2._2
       val report = entry._2._1.copy(
@@ -186,19 +204,54 @@ object NDayPerformanceAnalyzer extends App {
       val account = entry._1
 
       (account -> report)
-  } persist
-
-  val nn = for{
-    report <- reportsWithEstimatedDailyKwh.take(5)
-    location = report._1.location
-    nn = reportsWithEstimatedDailyKwh.sortBy(v => location.haversineDistance(v._1.location)).take(nearestNeighbours)
-  } yield {
-    (report._1 -> nn.map(_._1.location).toList)
   }
 
-  println(nn.mkString("\n"))
+  val reportsWithEstimatedDailyKwhSample = reportsWithEstimatedDailyKwh sample(false, 0.01) persist
 
-  sc.stop()
+  val cartesian = reportsWithEstimatedDailyKwhSample.cartesian(reportsWithEstimatedDailyKwhSample) filter {
+    v =>
+      v._1._1 != v._2._1
+  }
+
+  val mapped = cartesian map {
+    v =>
+      (v._1._1 -> Vector((v._1._1.location.haversineDistance(v._2._1.location), v._2._2, v._2._1.location)))
+  }
+
+  val grouped = mapped reduceByKey {
+    (v1, v2) =>
+
+      (v1 ++ v2).sortBy(_._1).take(50)
+
+  }
+
+  val finalReports = (for {
+
+    group <- reportsWithEstimatedDailyKwhSample.join(grouped)
+    account = group._1
+    report = group._2._1
+    neighborhoodReports = group._2._2.map(_._2)
+
+  } yield {
+
+    println(s"${account.location} -> ${group._2._2.map(v => (v._1, v._3)).toList}")
+
+    val neighborhoodRatios = neighborhoodReports.map(nn => nn.performanceRatio)
+
+    report.copy(
+      neighbourhoodPerformanceRatio = neighborhoodRatios.mean,
+      neighbourhoodStdDev = neighborhoodRatios.stddev,
+      neighbourhoodDevAvg = report.performanceRatio - neighborhoodRatios.mean,
+      zScore = (report.performanceRatio - neighborhoodRatios.mean) / neighborhoodRatios.stddev
+    )
+
+  }) persist
+
+  import com.sungevity.analytics.helpers.Csv._
+
+  val r = finalReports.repartition(1).toLocalIterator.asCSV.take(5)
+
+  println(r.mkString("\n"))
 
   system.shutdown()
 
