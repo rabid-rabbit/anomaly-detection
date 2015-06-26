@@ -30,7 +30,7 @@ object Csv {
     report.interconnectionDate,
     report.actualKwh,
     report.estimatedKwh,
-    report.sum,
+    report.readimgsSum,
     report.blanksCount,
     report.smallValuesCount,
     report.neighbourhoodPerformanceRatio,
@@ -56,7 +56,7 @@ object Csv {
       ("Neighborhood standard dev", neighbourhoodStdDev),
       ("Deviation from neighborhood average", neighbourhoodDevAvg),
       ("Z Score", zScore),
-      ("Sum", sum),
+      ("Sum", readimgsSum),
       ("Blanks", blanksCount),
       ("<=1", smallValuesCount)
     ) ++ readings.map{

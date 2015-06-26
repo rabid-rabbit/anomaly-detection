@@ -117,6 +117,8 @@ object NDayPerformanceAnalyzer extends App {
 
     }
 
+    estimatedMonthlyKwh.saveAs
+
     val estimatedDailyKwh = estimatedMonthlyKwh map {
       estimates =>
 
@@ -161,18 +163,19 @@ object NDayPerformanceAnalyzer extends App {
     val groupedReports = reports.groupBy(r => r.account) map {
       group =>
 
-        val reports = group._2 reduce {
+        val report = group._2 reduce {
           (a, b) =>
             val readings = a.readings ++ b.readings
             a.copy(
-              readings = readings,
-              sum = readings.map(_.reading).sum,
-              blanksCount = days.length - readings.length,
-              smallValuesCount = readings.map(v => if (v.reading <= 1) 1 else 0).sum
+              readings = readings
             )
         }
 
-        (group._1 -> reports)
+        (group._1 -> report.copy(
+          readimgsSum = report.readings.map(_.reading).sum,
+          blanksCount = days.length - report.readings.length,
+          smallValuesCount = report.readings.map(v => if (v.reading <= 1) 1 else 0).sum
+        ))
 
     }
 
@@ -181,7 +184,7 @@ object NDayPerformanceAnalyzer extends App {
 
         val estimatedDailyKwh = entry._2._2
         val report = entry._2._1.copy(
-          performanceRatio = entry._2._1.sum / estimatedDailyKwh.sum,
+          performanceRatio = entry._2._1.readimgsSum / estimatedDailyKwh.sum,
           estimatedReadings = estimatedDailyKwh.toSeq,
           estimatedKwh = estimatedDailyKwh.sum)
         val account = entry._1
