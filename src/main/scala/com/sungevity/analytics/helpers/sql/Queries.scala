@@ -143,8 +143,8 @@ object Queries {
       |
       |  WHERE
       |		( l.meter_id LIKE '%.1' OR l.meter_id LIKE 'VALHALLA%' )
-      |		AND l.reading_date >= '${sqlDateFormat.print(start)}'
-      |		AND l.reading_date <= '${sqlDateFormat.print(end)}'
+      |   AND l.reading_date >= '2015-06-01'
+      |   AND l.reading_date <= '2015-06-10'
       |   AND l.reading_date is not NULL
       |
       |		GROUP BY l.reading_date, l.customer_id

@@ -68,9 +68,9 @@ object Csv {
 
   implicit class IterableReportFormat(iterable: Iterator[Report]) extends Iterator[String] {
 
-    val firstLine = Option(iterable.next())
+    lazy val firstLine = if(iterable.hasNext) Option(iterable.next()) else None
 
-    val header = firstLine.map{
+    lazy val header = firstLine.map{
       line =>
         Iterator.single{
           line.asCSVHeader
