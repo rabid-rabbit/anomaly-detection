@@ -1,9 +1,12 @@
 package com.sungevity.analytics.helpers.sql
 
+import com.typesafe.config.Config
+
 object ConnectionStrings {
 
-  val local = "jdbc:mysql://localhost:3306?user=root&password=root"
-
-  val prod = "jdbc:mysql://prod-replica-reports.caccvpdn1wcb.us-east-1.rds.amazonaws.com?user=salesforce_user&password=ooy4EiZo"
+  def current(implicit config: Config) = {
+    val db = config.getString("db.current")
+    config.getString(s"db.$db.connection-string")
+  }
 
 }

@@ -1,0 +1,38 @@
+db {
+
+ current = "local"
+
+ local {
+  connection-string="jdbc:mysql://localhost:3306?user=root&password=root"
+ }
+
+}
+
+spark {
+
+ master = "spark://localhost:7077"
+
+}
+
+cassandra {
+
+ connection-host = "localhost"
+
+ spark-cleaner-ttl = 3600
+
+}
+
+input {
+
+ range = 10
+
+ nearest-neighbours = 50
+
+}
+
+
+output {
+
+ path = "/tmp/output.csv"
+
+}

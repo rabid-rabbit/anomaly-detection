@@ -1,6 +1,6 @@
 package com.sungevity.analytics.utils
 
-import java.nio.file.OpenOption
+import java.nio.file.{Files, Paths, OpenOption}
 
 object IOUtils {
 
@@ -13,5 +13,9 @@ object IOUtils {
 
   def read(path: String): String =
     scala.io.Source.fromFile(path).getLines.mkString
+
+  def isReadable(path: String) = Files.isReadable(Paths.get(path))
+
+  def isWritable(path: String) = Files.isWritable(Paths.get(path))
 
 }

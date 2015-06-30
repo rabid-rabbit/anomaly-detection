@@ -57,8 +57,8 @@ object Queries {
       |
     """.stripMargin
 
-  val systemData =
-    """
+  def systemData =
+    s"""
       |SELECT
       |
       | a.AccountNumber AS 'accountNumber',
@@ -103,7 +103,7 @@ object Queries {
       |
       |	WHERE (
       |		cs.`Status` <> 'Closed'
-      |		OR cs.ClosedDate > DATE( DATE_SUB( '2015-06-06', INTERVAL 10 DAY ) )
+      |		OR cs.ClosedDate > DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL 10 DAY ) )
       |	)
       |	AND cs.`Type` IN (
       |		  'Equipment Failure',
@@ -121,10 +121,10 @@ object Queries {
       |
       |
       |WHERE
-      |    l.reading_date >= DATE( DATE_SUB( '2015-06-06', INTERVAL 10 DAY ) )
-      |AND l.reading_date <= DATE( DATE_SUB( '2015-06-06', INTERVAL  1 DAY ) )
+      |    l.reading_date >= DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL 10 DAY ) )
+      |AND l.reading_date <= DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL  1 DAY ) )
       |
-      |AND p.Final_Inter_Approved__c < DATE( DATE_SUB( '2015-06-06', INTERVAL 11 DAY ) )
+      |AND p.Final_Inter_Approved__c < DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL 11 DAY ) )
       |
       |GROUP BY a.AccountNumber
       |
@@ -143,8 +143,8 @@ object Queries {
       |
       |  WHERE
       |		( l.meter_id LIKE '%.1' OR l.meter_id LIKE 'VALHALLA%' )
-      |   AND l.reading_date >= '2015-06-01'
-      |   AND l.reading_date <= '2015-06-10'
+      |		AND l.reading_date >= '${sqlDateFormat.print(start)}'
+      |		AND l.reading_date <= '${sqlDateFormat.print(end)}'
       |   AND l.reading_date is not NULL
       |
       |		GROUP BY l.reading_date, l.customer_id

@@ -1,5 +1,9 @@
 package com.sungevity.analytics
 
+import java.io.File
+
+import com.typesafe.config.ConfigFactory
+
 import java.nio.file.StandardOpenOption
 
 import akka.actor.ActorSystem
@@ -18,41 +22,7 @@ import com.github.nscala_time.time.Imports._
 import utils.Statistics._
 import utils.Cassandra._
 
-trait SparkConfig {
-
-  val conf = new SparkConf().setAppName("NDayPerformanceAnalyzer").set("spark.cassandra.connection.host", "127.0.0.1").set("spark.cleaner.ttl", "3600")
-
-  val sc = new SparkContext(conf)
-
-  val sqlContext = new SQLContext(sc)
-
-}
-
-trait DataSources extends SparkConfig {
-
-  val allSystemsData = sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.allSystems}) as all_systems",
-    "driver" -> "com.mysql.jdbc.Driver"))
-
-  val systemData = sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.systemData}) as system_data",
-    "driver" -> "com.mysql.jdbc.Driver"))
-
-  val productionData = sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.local,
-    "dbtable" -> s"(${Queries.productionData(DateTime.now - 20.days, DateTime.now - 10.days)}) as production_data",
-    "driver" -> "com.mysql.jdbc.Driver"))
-
-  CassandraConnector(conf).withSessionDo { session =>
-    session.execute(s"CREATE KEYSPACE IF NOT EXISTS ${Cassandra.keyspaceName} WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
-    session.execute(s"CREATE TABLE IF NOT EXISTS ${Cassandra.keyspaceName}.est_monthly_kwh (accountID VARCHAR PRIMARY KEY, estimates LIST<INT>)")
-  }
-
-}
-
-object NDayPerformanceAnalyzer extends App with DataSources {
+object NDayPerformanceAnalyzer extends App {
 
   def help() {
     println(s"${this.getClass.getSimpleName} <nDays> <nearestNeighbours> <outputFile>")
@@ -60,27 +30,60 @@ object NDayPerformanceAnalyzer extends App with DataSources {
 
   def dateRange(from: DateTime, to: DateTime, step: Period): Iterator[DateTime] = Iterator.iterate(from)(_.plus(step)).takeWhile(!_.isAfter(to))
 
+  if(args.length != 1){
+    println("Incorrect number of input parameters.")
+    help()
+    sys.exit(1)
+  }
+
+  if(!IOUtils.isReadable(args(0))){
+    println("Could not open configuration file.")
+    sys.exit(2)
+  }
+
+  implicit val driverConfig = ConfigFactory.parseFile(new File(args(0)))
+
+  val nDays = driverConfig.getInt("input.range")
+
+  val nearestNeighbours = driverConfig.getInt("input.nearest-neighbours")
+
+  val outputPath = driverConfig.getString("output.path")
+
+  def startDate = DateTime.now
+
+  def endDate = startDate + nDays.days
+
+  def days = dateRange(startDate, endDate, new Period().withDays(1))
+
+  val conf = new SparkConf().setAppName("NDayPerformanceAnalyzer").set("spark.cassandra.connection.host", driverConfig.getString("cassandra.connection-host")).set("spark.cleaner.ttl", driverConfig.getString("cassandra.spark-cleaner-ttl"))
+
+  val sc = new SparkContext(conf)
+
+  val sqlContext = new SQLContext(sc)
+
+  val allSystemsData = sqlContext.load("jdbc", Map(
+    "url" -> ConnectionStrings.current,
+    "dbtable" -> s"(${Queries.allSystems}) as all_systems",
+    "driver" -> "com.mysql.jdbc.Driver"))
+
+  val systemData = sqlContext.load("jdbc", Map(
+    "url" -> ConnectionStrings.current,
+    "dbtable" -> s"(${Queries.systemData}) as system_data",
+    "driver" -> "com.mysql.jdbc.Driver"))
+
+  val productionData = sqlContext.load("jdbc", Map(
+    "url" -> ConnectionStrings.current,
+    "dbtable" -> s"(${Queries.productionData(startDate, endDate)}) as production_data",
+    "driver" -> "com.mysql.jdbc.Driver"))
+
+  CassandraConnector(conf).withSessionDo { session =>
+    session.execute(s"CREATE KEYSPACE IF NOT EXISTS ${Cassandra.keyspaceName} WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
+    session.execute(s"CREATE TABLE IF NOT EXISTS ${Cassandra.keyspaceName}.est_monthly_kwh (accountID VARCHAR PRIMARY KEY, estimates LIST<INT>)")
+  }
+
   implicit val system = ActorSystem()
 
   try {
-
-    if (args.size < 3) {
-      println("Incorrect number of input parameters.")
-      help()
-      sys.exit(1)
-    }
-
-    val nDays = args(0).toInt
-
-    val nearestNeighbours = args(1).toInt
-
-    val outputPath = args(2)
-
-    def startDate = DateTime.now
-
-    def endDate = startDate + nDays.days
-
-    def days = dateRange(startDate, endDate, new Period().withDays(1))
 
     val accounts = {
 
