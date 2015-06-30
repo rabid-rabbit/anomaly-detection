@@ -1,14 +1,14 @@
 #!/bin/sh
 
 function help {
-  echo "local <number_of_days> <number_of_neighbours> <output_file>|remote <spark-master-url> <number_of_days> <number_of_neighbours> <output_file>"
+  echo "local <config>|remote <spark-master-url> <config>"
 }
 
 BASEDIR=$(dirname $0)
 EXECUTOR_MEMORY=10G
 DRIVER_MEMORY=2G
 
-if [ "$#" -lt 4 ]; then
+if [ "$#" -lt 2 ]; then
   echo "Incorrect number of input arguments"
   help
   exit 1
@@ -16,13 +16,13 @@ fi
 
 if [ "x$1" == "xlocal" ]; then
 
- (cd $BASEDIR; sbt -Dspark.master=local "run $2 $3 $4")
+ (cd $BASEDIR; sbt -Dspark.master=local "run $2")
 
 fi
 
 if [ "x$1" == "xremote" ]; then
 
- if [ "$#" -ne 5 ]; then
+ if [ "$#" -ne 3 ]; then
   echo "Incorrect number of input arguments2"
   help
   exit 1
@@ -33,7 +33,7 @@ if [ "x$1" == "xremote" ]; then
   exit 2
  fi
 
- spark-submit --class com.sungevity.analytics.NDayPerformanceAnalyzer --executor-memory $EXECUTOR_MEMORY --driver-memory $DRIVER_MEMORY --master $2 $BASEDIR/target/scala-2.11/anomaly-detection-assembly-1.0.jar $3 $4 $5
+ spark-submit --class com.sungevity.analytics.NDayPerformanceAnalyzer --executor-memory $EXECUTOR_MEMORY --driver-memory $DRIVER_MEMORY --master $2 $BASEDIR/target/scala-2.11/anomaly-detection-assembly-1.0.jar $3
 
 fi
 

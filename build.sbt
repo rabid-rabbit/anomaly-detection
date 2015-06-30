@@ -23,5 +23,6 @@ mainClass := Some("com.sungevity.analytics.NDayPerformanceAnalyzer")
 
 assemblyMergeStrategy in assembly := {
   case m if m.startsWith("META-INF") => MergeStrategy.discard
+  case c if c.startsWith("reference.") => MergeStrategy.concat
   case _         => MergeStrategy.first
 }

@@ -1,16 +1,12 @@
+include "reference.conf"
+
 db {
 
  current = "local"
 
  local {
-  connection-string="jdbc:mysql://localhost:3306?user=root&password=root"
+  connection-string="jdbc:mysql://localhost:3306?user=root&password="
  }
-
-}
-
-spark {
-
- master = "spark://localhost:7077"
 
 }
 
