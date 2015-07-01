@@ -5,8 +5,8 @@ import com.typesafe.config.Config
 object ConnectionStrings {
 
   def current(implicit config: Config) = {
-    val db = config.getString("db.current")
-    config.getString(s"db.$db.connection-string")
+    val db = config.getString("rdbms.current")
+    config.getString(s"rdbms.$db.connection-string")
   }
 
 }

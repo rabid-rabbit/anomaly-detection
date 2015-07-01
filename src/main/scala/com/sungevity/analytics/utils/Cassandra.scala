@@ -13,7 +13,7 @@ object Cassandra {
 
   implicit class CassandraUtils(keyspaceName: String) {
 
-    def getOrElse[K, V](keys: RDD[K], table: String, primaryKey: (K) => String = (k: K) => k.toString)(f: (K) => (K, V))
+    def getOrElse[K, V](keys: RDD[K], table: String, primaryKey: (K) => String = (k: K) => k.toString)(f: (K) => Option[V])
                        (implicit newType: ClassTag[(String, V)],
                         rrf: RowReaderFactory[(String, V)],
                         ev: ValidRDDType[(String, V)],
@@ -29,7 +29,7 @@ object Cassandra {
 
       val newKeys = keys.subtract(cachedEstimates.map(_._1))
 
-      val newEstimates = newKeys.map(f(_))
+      val newEstimates = newKeys.flatMap(v => f(v).map(v -> _))
 
       newEstimates.map(v => primaryKey(v._1) -> v._2).saveToCassandra(keyspaceName, table)
 

@@ -1,6 +1,6 @@
 include "reference.conf"
 
-db {
+rdbms {
 
  current = "local"
 
@@ -15,6 +15,12 @@ cassandra {
  connection-host = "localhost"
 
  spark-cleaner-ttl = 3600
+
+}
+
+price-engine {
+
+ response-max-latency = "30 seconds"
 
 }
 
