@@ -33,7 +33,7 @@ if [ "x$1" == "xremote" ]; then
   exit 2
  fi
 
- spark-submit --class com.sungevity.analytics.NDayPerformanceAnalyzer --executor-memory $EXECUTOR_MEMORY --driver-memory $DRIVER_MEMORY --master $2 $BASEDIR/target/scala-2.11/anomaly-detection-assembly-1.0.jar $3
+ spark-submit --class com.sungevity.analytics.Main --executor-memory $EXECUTOR_MEMORY --driver-memory $DRIVER_MEMORY --master $2 $BASEDIR/target/scala-2.11/anomaly-detection-assembly-1.0.jar $3
 
 fi
 

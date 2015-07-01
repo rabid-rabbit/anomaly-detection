@@ -1,95 +1,22 @@
-package com.sungevity.analytics
-
-import java.io.File
-
-import com.typesafe.config.ConfigFactory
+package com.sungevity.analytics.performanceanalyzer
 
 import java.nio.file.StandardOpenOption
 
-import com.datastax.spark.connector.cql.CassandraConnector
+import com.github.nscala_time.time.Imports._
 import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.rest.PriceEngine
-import com.sungevity.analytics.helpers.sql.{Queries, ConnectionStrings}
 import com.sungevity.analytics.model._
+import com.sungevity.analytics.performanceanalyzer.ApplicationContext
 import com.sungevity.analytics.utils.IOUtils
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.{SparkContext, SparkConf}
-
 import org.joda.time.DateTime
-import com.github.nscala_time.time.Imports._
 
-import utils.Statistics._
-import utils.Cassandra._
+case class Application(sources: ApplicationData) {
 
-import scala.concurrent.duration
-
-object NDayPerformanceAnalyzer {
-
-
-  def main(args: Array[String]) {
-
-    def help() {
-      println(s"${this.getClass.getSimpleName} <nDays> <nearestNeighbours> <outputFile>")
-    }
-
-    def dateRange(from: DateTime, to: DateTime, step: Period): Iterator[DateTime] = Iterator.iterate(from)(_.plus(step)).takeWhile(!_.isAfter(to))
-
-    if (args.length != 1) {
-      println("Incorrect number of input parameters.")
-      help()
-      sys.exit(1)
-    }
-
-    if (!IOUtils.isReadable(args(0))) {
-      println("Could not open configuration file.")
-      sys.exit(2)
-    }
-
-    implicit val driverConfig = ConfigFactory.parseFile(new File(args(0)))
-
-    val nDays = driverConfig.getInt("input.range")
-
-    val nearestNeighbours = driverConfig.getInt("input.nearest-neighbours")
-
-    val outputPath = driverConfig.getString("output.path")
-
-    val requestMaxLatency = duration.Duration(driverConfig.getString("price-engine.response-max-latency"))
-
-    val startDate = DateTime.now
-
-    val endDate = startDate + nDays.days
-
-    val days = dateRange(startDate, endDate, new Period().withDays(1))
-
-    val conf = new SparkConf().setAppName("NDayPerformanceAnalyzer").set("spark.cassandra.connection.host", driverConfig.getString("cassandra.connection-host")).set("spark.cleaner.ttl", driverConfig.getString("cassandra.spark-cleaner-ttl"))
-
-    val sc = new SparkContext(conf)
-
-    val sqlContext = new SQLContext(sc)
-
-    val allSystemsData = sqlContext.load("jdbc", Map(
-      "url" -> ConnectionStrings.current,
-      "dbtable" -> s"(${Queries.allSystems}) as all_systems",
-      "driver" -> "com.mysql.jdbc.Driver"))
-
-    val systemData = sqlContext.load("jdbc", Map(
-      "url" -> ConnectionStrings.current,
-      "dbtable" -> s"(${Queries.systemData}) as system_data",
-      "driver" -> "com.mysql.jdbc.Driver"))
-
-    val productionData = sqlContext.load("jdbc", Map(
-      "url" -> ConnectionStrings.current,
-      "dbtable" -> s"(${Queries.productionData(startDate, endDate)}) as production_data",
-      "driver" -> "com.mysql.jdbc.Driver"))
-
-    CassandraConnector(conf).withSessionDo { session =>
-      session.execute(s"CREATE KEYSPACE IF NOT EXISTS ${Cassandra.keyspaceName} WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
-      session.execute(s"CREATE TABLE IF NOT EXISTS ${Cassandra.keyspaceName}.est_monthly_kwh (accountID VARCHAR PRIMARY KEY, estimates LIST<INT>)")
-    }
+  def run(config: ApplicationContext) {
 
     val accounts = {
 
-      val accounts = allSystemsData.map {
+      val accounts = sources.allSystemsData.map {
         row =>
 
           val location = Location(row.getString(1), "", row.getString(2).toDouble, row.getString(3).toDouble)
@@ -140,7 +67,7 @@ object NDayPerformanceAnalyzer {
 
         println(s"getting estimates for ${account}")
 
-        val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account), requestMaxLatency)
+        val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account), config.requestMaxLatency)
 
         if (result.response.isEmpty) {
           println(s"could not get estimates for ${account}")
@@ -154,7 +81,7 @@ object NDayPerformanceAnalyzer {
 
         val monthlyOutput = estimates._2
 
-        val dailyEstimates = dateRange(startDate, endDate, new Period().withDays(1)) map {
+        val dailyEstimates = config.startDate.dateRange(config.endDate, new Period().withDays(1)) map {
 
           day =>
 
@@ -172,7 +99,7 @@ object NDayPerformanceAnalyzer {
 
     val reports = {
 
-      val reports = systemData.join(productionData, productionData("accountNumber") === systemData("accountNumber"), "inner") map {
+      val reports = sources.systemData.join(sources.productionData, sources.productionData("accountNumber") === sources.systemData("accountNumber"), "inner") map {
         row =>
 
           val byName = (0 until row.schema.length).map(i => row.schema(i).name -> i).toMap
@@ -200,7 +127,7 @@ object NDayPerformanceAnalyzer {
 
           (group._1 -> report.copy(
             readimgsSum = report.readings.map(_.reading).sum,
-            blanksCount = days.length - report.readings.length,
+            blanksCount = config.days.length - report.readings.length,
             smallValuesCount = report.readings.map(v => if (v.reading <= 1) 1 else 0).sum
           ))
 
@@ -242,7 +169,7 @@ object NDayPerformanceAnalyzer {
 
       accountsWithDistances reduceByKey {
         (distanceAndReportA, distanceAndReportB) =>
-          (distanceAndReportA ++ distanceAndReportB).sortBy(_._1).take(nearestNeighbours)
+          (distanceAndReportA ++ distanceAndReportB).sortBy(_._1).take(config.nearestNeighbours)
       }
 
     }
@@ -271,7 +198,7 @@ object NDayPerformanceAnalyzer {
 
     finalReports.repartition(10).toLocalIterator.asCSV.foreach {
       line =>
-        IOUtils.write(outputPath, s"$line\n", StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+        IOUtils.write(config.outputPath, s"$line\n", StandardOpenOption.APPEND, StandardOpenOption.CREATE)
     }
 
   }

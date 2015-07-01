@@ -19,7 +19,7 @@ libraryDependencies ++= Seq(
   "org.scalanlp" % "breeze_2.10" % "0.11.2"
 )
 
-mainClass := Some("com.sungevity.analytics.NDayPerformanceAnalyzer")
+mainClass := Some("com.sungevity.analytics.Main")
 
 assemblyMergeStrategy in assembly := {
   case m if m.startsWith("META-INF") => MergeStrategy.discard
