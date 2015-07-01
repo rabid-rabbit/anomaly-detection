@@ -3,7 +3,6 @@ package com.sungevity.analytics.performanceanalyzer
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.sql.{ConnectionStrings, Queries}
-import com.sungevity.analytics.performanceanalyzer.SparkConfiguration
 import com.typesafe.config.Config
 import org.apache.spark.sql.SQLContext
 

@@ -6,6 +6,8 @@ import org.joda.time.{DateTime, Period}
 
 import scala.concurrent.duration.Duration
 
+import com.sungevity.analytics.utils.Date._
+
 class ApplicationContext(config: Config) extends Serializable {
 
   val nDays = config.getInt("input.range")

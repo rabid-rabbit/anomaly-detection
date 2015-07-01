@@ -6,9 +6,14 @@ import com.github.nscala_time.time.Imports._
 import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.rest.PriceEngine
 import com.sungevity.analytics.model._
-import com.sungevity.analytics.performanceanalyzer.ApplicationContext
 import com.sungevity.analytics.utils.IOUtils
 import org.joda.time.DateTime
+
+import com.github.nscala_time.time.Imports._
+
+import com.sungevity.analytics.utils.Cassandra._
+import com.sungevity.analytics.utils.Date._
+import com.sungevity.analytics.utils.Statistics._
 
 case class Application(sources: ApplicationData) {
 
