@@ -11,6 +11,10 @@ object String {
         (prev zip prev.tail zip that).scanLeft(prev.head + 1) {
           case (h, ((d, v), y)) => min(min(h + 1, v + 1), d + (if (x == y) 0 else 1))
         }) last
+
+
+    def ≈≈(str: String) = this.levenshteinDistance(str) < 2
+
   }
 
 }

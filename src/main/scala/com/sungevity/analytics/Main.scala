@@ -34,7 +34,7 @@ object Main extends App {
   for {
     entry <- commandsRegistry
     context = entry._1(config)
-    command = entry._2.asInstanceOf[SparkApplication[SparkApplicationContext]] if context.applicationName.toLowerCase.levenshteinDistance(args(0).toLowerCase) < 2
+    command = entry._2.asInstanceOf[SparkApplication[SparkApplicationContext]] if context.applicationName.toLowerCase ≈≈ args(0).toLowerCase
   } yield {
     command.run(context)
   }
