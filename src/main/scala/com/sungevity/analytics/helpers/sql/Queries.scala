@@ -57,7 +57,7 @@ object Queries {
       |
     """.stripMargin
 
-  def systemData =
+  def systemData(start: DateTime, end: DateTime, nDays: Int) =
     s"""
       |SELECT
       |
@@ -103,7 +103,7 @@ object Queries {
       |
       |	WHERE (
       |		cs.`Status` <> 'Closed'
-      |		OR cs.ClosedDate > DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL 10 DAY ) )
+      |		OR cs.ClosedDate > '${sqlDateFormat.print(start)}'
       |	)
       |	AND cs.`Type` IN (
       |		  'Equipment Failure',
@@ -121,10 +121,10 @@ object Queries {
       |
       |
       |WHERE
-      |    l.reading_date >= DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL 10 DAY ) )
-      |AND l.reading_date <= DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL  1 DAY ) )
+      |    l.reading_date >= '${sqlDateFormat.print(start)}'
+      |AND l.reading_date <= '${sqlDateFormat.print(end)}'
       |
-      |AND p.Final_Inter_Approved__c < DATE( DATE_SUB( '${sqlDateFormat.print(DateTime.now)}', INTERVAL 11 DAY ) )
+      |AND p.Final_Inter_Approved__c < DATE( DATE_SUB( '${sqlDateFormat.print(end)}', INTERVAL ${nDays + 1} DAY ) )
       |
       |GROUP BY a.AccountNumber
       |

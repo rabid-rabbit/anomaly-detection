@@ -16,7 +16,7 @@ case class NDayPerformanceAnalyzerDataSources(context: NDayPerformanceAnalyzerCo
 
   val systemData = sqlContext.load("jdbc", Map(
     "url" -> ConnectionStrings.current(context.config),
-    "dbtable" -> s"(${Queries.systemData}) as system_data",
+    "dbtable" -> s"(${Queries.systemData(context.startDate, context.endDate, context.nDays)}) as system_data",
     "driver" -> "com.mysql.jdbc.Driver"))
 
   val productionData = sqlContext.load("jdbc", Map(

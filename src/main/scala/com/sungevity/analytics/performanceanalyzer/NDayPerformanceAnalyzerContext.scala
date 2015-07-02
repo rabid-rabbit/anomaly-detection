@@ -21,9 +21,9 @@ class NDayPerformanceAnalyzerContext(config: Config) extends SparkApplicationCon
 
   val requestMaxLatency = Duration(config.getString("price-engine.response-max-latency"))
 
-  val startDate = DateTime.now
+  val startDate = DateTime.now - nDays.days
 
-  val endDate = startDate + nDays.days
+  val endDate = DateTime.now - 1
 
   val days = startDate.dateRange(endDate, new Period().withDays(1)).toArray
 
