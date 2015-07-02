@@ -2,7 +2,7 @@ package com.sungevity.analytics.performanceanalyzer
 
 import java.nio.file.StandardOpenOption
 
-import com.github.nscala_time.time.Imports._
+import com.sungevity.analytics.SparkApplication
 import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.rest.PriceEngine
 import com.sungevity.analytics.model._
@@ -15,9 +15,11 @@ import com.sungevity.analytics.utils.Cassandra._
 import com.sungevity.analytics.utils.Date._
 import com.sungevity.analytics.utils.Statistics._
 
-case class Application(sources: ApplicationData) {
+class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerContext] {
 
-  def run(config: ApplicationContext) {
+  override def run(config: NDayPerformanceAnalyzerContext) {
+
+    val sources = new NDayPerformanceAnalyzerDataSources(config)
 
     val accounts = {
 

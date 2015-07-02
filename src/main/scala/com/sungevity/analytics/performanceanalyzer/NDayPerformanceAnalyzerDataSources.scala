@@ -3,25 +3,24 @@ package com.sungevity.analytics.performanceanalyzer
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.sql.{ConnectionStrings, Queries}
-import com.typesafe.config.Config
 import org.apache.spark.sql.SQLContext
 
-case class ApplicationData(context: ApplicationContext, config: Config) extends SparkConfiguration {
+case class NDayPerformanceAnalyzerDataSources(context: NDayPerformanceAnalyzerContext) extends SparkConfiguration {
 
   val sqlContext = new SQLContext(sc)
 
   val allSystemsData = sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.current(config),
+    "url" -> ConnectionStrings.current(context.config),
     "dbtable" -> s"(${Queries.allSystems}) as all_systems",
     "driver" -> "com.mysql.jdbc.Driver"))
 
   val systemData = sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.current(config),
+    "url" -> ConnectionStrings.current(context.config),
     "dbtable" -> s"(${Queries.systemData}) as system_data",
     "driver" -> "com.mysql.jdbc.Driver"))
 
   val productionData = sqlContext.load("jdbc", Map(
-    "url" -> ConnectionStrings.current(config),
+    "url" -> ConnectionStrings.current(context.config),
     "dbtable" -> s"(${Queries.productionData(context.startDate, context.endDate)}) as production_data",
     "driver" -> "com.mysql.jdbc.Driver"))
 
