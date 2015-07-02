@@ -15,17 +15,17 @@ object Main extends App {
   )
 
   def help() {
-    println(s"${this.getClass.getSimpleName} <command> <configuration file>")
+    println(s"\nUsage: ${this.getClass.getName} <command> <configuration file>\n")
   }
 
   if (args.length < 2) {
-    println("Incorrect number of input parameters.")
+    Console.err.println("Incorrect number of input arguments.")
     help()
     sys.exit(1)
   }
 
   if (!IOUtils.isReadable(args(1))) {
-    println("Could not open configuration file.")
+    Console.err.println("Could not open configuration file.")
     sys.exit(2)
   }
 

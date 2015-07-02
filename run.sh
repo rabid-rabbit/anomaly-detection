@@ -1,7 +1,12 @@
 #!/bin/sh
 
 function help {
-  echo "local <command> <config>|remote <spark-master-url> <command> <config>"
+  echo
+  echo "Usage: local <command> <config>|remote <spark-master-url> <command> <config>"
+  echo
+  echo "available commands:"
+  echo "  NDayPerformanceAnalyzer"
+  echo
 }
 
 BASEDIR=$(dirname $0)
