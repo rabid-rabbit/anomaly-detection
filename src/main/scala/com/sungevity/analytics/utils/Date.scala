@@ -9,6 +9,8 @@ object Date {
 
     def dateRange(to: DateTime, step: Period): Iterator[DateTime] = Iterator.iterate(date)(_.plus(step)).takeWhile(!_.isAfter(to))
 
+    def yesterday = if(date.hourOfDay() == 0 && date.minuteOfDay() == 0) date else date.minusDays(1)
+
   }
 
 }

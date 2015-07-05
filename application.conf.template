@@ -24,17 +24,29 @@ price-engine {
 
 }
 
-input {
+nday-performance-analyzer {
 
- range = 10
+ sample {
 
- nearest-neighbours = 50
+  on = true
 
-}
+  fraction = 0.01
+
+ }
+
+ input {
+
+  range = 10
+
+  nearest-neighbours = 50
+
+ }
 
 
-output {
+ output {
 
- path = "/tmp/output.csv"
+  path = "/tmp/output.csv"
+
+ }
 
 }

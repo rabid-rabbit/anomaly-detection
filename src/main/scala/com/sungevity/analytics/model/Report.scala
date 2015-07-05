@@ -8,6 +8,7 @@ case class Report(account: Account,
                   pgVoid: String,
                   openCase: String,
                   performanceRatio: Double,
+                  count: Double,
                   pgNotes: String,
                   readings: Seq[ProductionData],
                   estimatedReadings: Seq[Double],
@@ -27,6 +28,7 @@ case class Report(account: Account,
       s" pgVoid = [$pgVoid]," +
       s" openCase = [$openCase]," +
       s" performanceRatio = [$performanceRatio]," +
+      s" count = [$count]," +
       s" pgNotes = [$pgNotes]," +
       s" readings = [$readings]," +
       s" estimatedReadings = [$estimatedReadings]," +
@@ -45,7 +47,7 @@ case class Report(account: Account,
 
 object Report {
 
-  def apply(account: Account, pgVoid: String, openCase: String, pgNotes: String, readings: Seq[ProductionData], interconnectionDate: DateTime, actualKwh: Double) =
-    new Report(account, pgVoid, openCase, 0.0, pgNotes, readings, Seq.empty[Double], interconnectionDate, actualKwh, 0.0, 0.0, 0, 0, 0.0, 0.0, 0.0, 0.0)
+  def apply(account: Account, pgVoid: String, openCase: String, count: Double, pgNotes: String, readings: Seq[ProductionData], interconnectionDate: DateTime, actualKwh: Double) =
+    new Report(account, pgVoid, openCase, 0.0, count, pgNotes, readings, Seq.empty[Double], interconnectionDate, actualKwh, 0.0, 0.0, 0, 0, 0.0, 0.0, 0.0, 0.0)
 
 }

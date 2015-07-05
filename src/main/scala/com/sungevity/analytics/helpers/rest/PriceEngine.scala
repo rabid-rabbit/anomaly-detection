@@ -2,9 +2,9 @@ package com.sungevity.analytics.helpers.rest
 
 import akka.actor.ActorSystem
 import com.sungevity.analytics.model.{ProductionEstimation, PEResponse, Account, PERequest}
-import com.typesafe.config.Config
+import org.slf4j.LoggerFactory
 import spray.client.pipelining._
-import spray.http.HttpRequest
+import spray.http.{HttpResponse, HttpRequest}
 import spray.httpx.SprayJsonSupport._
 
 import scala.concurrent.duration._
@@ -14,15 +14,41 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object PriceEngine {
 
+  val log = LoggerFactory.getLogger(getClass.getName)
+
   import com.sungevity.analytics.helpers.rest.protocols.PriceEngine._
 
   lazy implicit val system = ActorSystem()
 
+  val logRequest: HttpRequest => HttpRequest = { r => log.debug(r.toString); r }
+
+  val logResponse: HttpResponse => HttpResponse = {
+    r =>
+
+      r.status.intValue match {
+        case 200 => log.debug(s"PE response is [${r.toString}]")
+        case _ => log.warn(s"PE response is [${r.toString}]")
+      }
+
+      r
+  }
+
   def monthlyKwh(account: PERequest[Account], requestMaxLatency: Duration = 10 seconds): PEResponse[Seq[ProductionEstimation]] = {
 
-    val pipeline: HttpRequest => Future[PEResponse[Seq[ProductionEstimation]]] = sendReceive ~> unmarshal[PEResponse[Seq[ProductionEstimation]]]
+    try {
 
-    Await result (pipeline(Post("http://brsf.sungevity.com", account)), requestMaxLatency)
+      val pipeline: HttpRequest => Future[PEResponse[Seq[ProductionEstimation]]] = logRequest ~> sendReceive ~> logResponse ~> unmarshal[PEResponse[Seq[ProductionEstimation]]]
+
+      Await result(pipeline(Post("http://brsf.sungevity.com", account)), requestMaxLatency)
+
+    } catch {
+
+      case t: Throwable => {
+        log.error("Could not make a request to PE", t)
+        PEResponse(Seq.empty)
+      }
+
+    }
 
   }
 

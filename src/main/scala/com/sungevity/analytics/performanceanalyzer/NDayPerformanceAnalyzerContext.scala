@@ -13,17 +13,22 @@ class NDayPerformanceAnalyzerContext(config: Config) extends SparkApplicationCon
 
   val applicationName = "NDayPerformanceAnalyzer"
 
-  val nDays = config.getInt("input.range")
+  val nDays = config.getInt("nday-performance-analyzer.input.range")
 
-  val nearestNeighbours = config.getInt("input.nearest-neighbours")
+  val nearestNeighbours = config.getInt("nday-performance-analyzer.input.nearest-neighbours")
 
-  val outputPath = config.getString("output.path")
+  val outputPath = config.getString("nday-performance-analyzer.output.path")
 
   val requestMaxLatency = Duration(config.getString("price-engine.response-max-latency"))
 
+  val sampleFraction = config.getBoolean("nday-performance-analyzer.sample.on") match {
+    case true => Some(config.getDouble("nday-performance-analyzer.sample.fraction"))
+    case false => None
+  }
+
   val startDate = DateTime.now - nDays.days
 
-  val endDate = DateTime.now - 1
+  val endDate = DateTime.now.yesterday
 
   val days = startDate.dateRange(endDate, new Period().withDays(1)).toArray
 
