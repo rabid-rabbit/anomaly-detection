@@ -7,6 +7,7 @@ import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.rest.PriceEngine
 import com.sungevity.analytics.model._
 import com.sungevity.analytics.utils.IOUtils
+import org.apache.spark.Accumulator
 import org.joda.time.DateTime
 
 import com.github.nscala_time.time.Imports._
@@ -24,6 +25,14 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
   override def run(context: NDayPerformanceAnalyzerContext) {
 
     val sources = new NDayPerformanceAnalyzerDataSources(context)
+
+    val priceEngineEmptyResponses = sources.sc.accumulator(0, "PE empty responses")
+
+    val accountsNumber = sources.sc.accumulator(0, "Accounts")
+
+    val reportsNumber = sources.sc.accumulator(0, "Reports")
+
+    val finalReportsNumber = sources.sc.accumulator(0, "Final Reports")
 
     val accounts = {
 
@@ -60,11 +69,13 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
       }
 
-      accounts.groupBy(account => account.accountID).map(group => group._2.reduce((a, b) => a + b))
+      accounts.groupBy(account => account.accountID).map{
+        group =>
+          accountsNumber += 1
+          group._2.reduce((a, b) => a + b)
+      }
 
     }
-
-    val priceEngineEmptyResponses = sources.sc.accumulator(0, "My Accumulator")
 
     val estimatedMonthlyKwh = Cassandra.keyspaceName.getOrElse(accounts, "est_monthly_kwh", (a: Account) => a.accountID) {
       account =>
@@ -75,7 +86,13 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
           priceEngineEmptyResponses += 1
         }
 
-        result.response.headOption.map(_.monthlyOutput.toList)
+        result.response.map(_.monthlyOutput).reduceOption{
+
+          (a, b) =>
+
+            a.zip(b).map(v => v._1 + v._2).toList
+
+        }
     }
 
     val estimatedDailyKwh = estimatedMonthlyKwh map {
@@ -87,9 +104,9 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
           day =>
 
-            def avgMonthlyKWh(month: DateTime.Property) = monthlyOutput(month.get - 1) / month.getMaximumValue
+            def avgMonthlyKWh(date: DateTime) = monthlyOutput(date.getMonthOfYear - 1) / date.dayOfMonth().getMaximumValue.toDouble
 
-            val dayAvgKwh = ((avgMonthlyKWh((day - 15.days).monthOfYear()) * 15 + avgMonthlyKWh((day + 15.days).monthOfYear()) * 15) / 30)
+            val dayAvgKwh = ((avgMonthlyKWh((day - 15.days)) * 15d + avgMonthlyKWh((day + 15.days)) * 15d) / 30d)
 
             dayAvgKwh
 
@@ -101,23 +118,35 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
     val reports = {
 
-      val reports = sources.systemData.join(sources.productionData, sources.productionData("accountNumber") === sources.systemData("accountNumber"), "inner") map {
+      val reports = sources.systemData.join(sources.productionData, sources.productionData("accountNumber") === sources.systemData("accountNumber"), "inner") flatMap {
         row =>
 
           val byName = row.byName
 
-          val location = Location("", row.getString(byName("state")), row.getString(byName("latitude")).toDouble, row.getString(byName("longitude")).toDouble)
+          val location = (Option(row.getString(byName("state"))), Option(row.getString(byName("latitude"))), Option(row.getString(byName("longitude")))) match {
+            case (Some(name), Some(latitude), Some(longitude)) =>
+              Some(Location("", name, latitude.toDouble, longitude.toDouble))
+            case _ => None
+          }
 
-          val account = Account(row.getString(byName("accountNumber")), row.getString(byName("name")), location, Seq.empty[SolarInstallation])
+          location.map {
 
-          val productionData = ProductionData(row.getString(byName("accountNumber")), new DateTime(row.get(byName("readingDate"))), row.getDouble(byName("reading")))
+            location =>
 
-          Report(account, row.getString(byName("pgVoid")), row.getString(byName("openCase")), row.getDecimal(byName("count")).doubleValue(), row.getString(byName("pgNotes")), List(productionData), new DateTime(row.get(byName("interconnectionDate"))), row.getDouble(byName("actualKwh")))
+              val account = Account(row.getString(byName("accountNumber")), row.getString(byName("name")), location, Seq.empty[SolarInstallation])
+
+              val productionData = ProductionData(row.getString(byName("accountNumber")), new DateTime(row.get(byName("readingDate"))), row.getDouble(byName("reading")))
+
+              Report(account, row.getString(byName("pgVoid")), row.getString(byName("openCase")), row.getDecimal(byName("count")).doubleValue(), row.getString(byName("pgNotes")), List(productionData), new DateTime(row.get(byName("interconnectionDate"))), row.getDouble(byName("actualKwh")))
+
+          }
 
       }
 
       val groupedReports = reports.groupBy(r => r.account) map {
         group =>
+
+          reportsNumber += 1
 
           val report = group._2 reduce {
             (a, b) =>
@@ -188,6 +217,8 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
     } yield {
 
+        finalReportsNumber += 1
+
         val neighborhoodRatios = neighborhoodReports.map(nn => nn.performanceRatio)
 
         report.copy(
@@ -206,7 +237,10 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
         IOUtils.write(context.outputPath, s"$line\n", StandardOpenOption.APPEND, StandardOpenOption.CREATE)
     }
 
-    log.info(s"Empty PE responses: ${priceEngineEmptyResponses.value} accounts")
+    Seq(priceEngineEmptyResponses, accountsNumber, reportsNumber, finalReportsNumber).foreach {
+      acc =>
+        log.info(s"${acc.name.getOrElse("Unknown Accumulator")}: [${acc.value}]")
+    }
 
   }
 

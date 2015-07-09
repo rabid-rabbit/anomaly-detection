@@ -20,14 +20,14 @@ object PriceEngine {
 
   lazy implicit val system = ActorSystem()
 
-  val logRequest: HttpRequest => HttpRequest = { r => log.debug(r.toString); r }
+  val logRequest: HttpRequest => HttpRequest = { r => log.debug(r.entity.data.asString); r }
 
   val logResponse: HttpResponse => HttpResponse = {
     r =>
 
       r.status.intValue match {
-        case 200 => log.debug(s"PE response is [${r.toString}]")
-        case _ => log.warn(s"PE response is [${r.toString}]")
+        case 200 => log.debug(s"PE response: [${r.status.intValue}], [${r.entity.data.asString}]")
+        case _ => log.warn(s"PE response: [${r.status.intValue}], [${r.entity.data.asString}]")
       }
 
       r
@@ -36,6 +36,8 @@ object PriceEngine {
   def monthlyKwh(account: PERequest[Account], requestMaxLatency: Duration = 10 seconds): PEResponse[Seq[ProductionEstimation]] = {
 
     try {
+
+      log.info(s"monthlyKwh for [${account.data.accountID}]")
 
       val pipeline: HttpRequest => Future[PEResponse[Seq[ProductionEstimation]]] = logRequest ~> sendReceive ~> logResponse ~> unmarshal[PEResponse[Seq[ProductionEstimation]]]
 

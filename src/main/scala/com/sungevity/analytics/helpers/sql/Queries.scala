@@ -124,7 +124,7 @@ object Queries {
       |    l.reading_date >= '${sqlDateFormat.print(start)}'
       |AND l.reading_date <= '${sqlDateFormat.print(end)}'
       |
-      |AND p.Final_Inter_Approved__c < DATE( DATE_SUB( '${sqlDateFormat.print(end)}', INTERVAL ${nDays + 1} DAY ) )
+      |AND p.Final_Inter_Approved__c < '${sqlDateFormat.print(start)}'
       |
       |GROUP BY a.AccountNumber
       |
@@ -151,5 +151,6 @@ object Queries {
     """.stripMargin
 
 }
+
 
 

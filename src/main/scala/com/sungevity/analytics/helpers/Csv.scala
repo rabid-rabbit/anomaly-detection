@@ -2,6 +2,7 @@ package com.sungevity.analytics.helpers
 
 import com.sungevity.analytics.helpers.Date._
 import com.sungevity.analytics.model.{Report}
+import org.apache.commons.lang3.StringEscapeUtils
 
 object Csv {
 
@@ -12,7 +13,7 @@ object Csv {
     def cells: Iterable[(String, Any)]
 
     def asCSV: String = cells.map(_._2) collect {
-      case s: String => s""""$s""""
+      case s: String => StringEscapeUtils.escapeCsv(s)
       case v => Option(v) map (_.toString) getOrElse("")
     } mkString(",")
 

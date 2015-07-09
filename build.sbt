@@ -16,7 +16,8 @@ libraryDependencies ++= Seq(
   "mysql"         % "mysql-connector-java" % "5.1.24",
   "joda-time" % "joda-time" % "2.8.1",
   "com.github.nscala-time" %% "nscala-time" % "2.0.0",
-  "org.scalanlp" % "breeze_2.10" % "0.11.2"
+  "org.scalanlp" % "breeze_2.10" % "0.11.2",
+  "org.apache.commons" % "commons-lang3" % "3.4"
 )
 
 mainClass := Some("com.sungevity.analytics.Main")
