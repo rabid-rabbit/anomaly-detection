@@ -17,7 +17,8 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.8.1",
   "com.github.nscala-time" %% "nscala-time" % "2.0.0",
   "org.scalanlp" % "breeze_2.10" % "0.11.2",
-  "org.apache.commons" % "commons-lang3" % "3.4"
+  "org.apache.commons" % "commons-lang3" % "3.4",
+  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test"
 )
 
 mainClass := Some("com.sungevity.analytics.Main")

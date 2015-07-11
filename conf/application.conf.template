@@ -10,6 +10,10 @@ rdbms {
 
 }
 
+spark {
+ default.parallelism = 200
+}
+
 cassandra {
 
  connection-host = "localhost"
@@ -28,7 +32,7 @@ nday-performance-analyzer {
 
  sample {
 
-  on = true
+  on = false
 
   fraction = 0.01
 

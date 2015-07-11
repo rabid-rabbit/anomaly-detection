@@ -13,6 +13,10 @@ object Date {
 
   }
 
+  implicit def strToDate(str: String) = {
+    DateTime.parse(str, DateTimeFormat.forPattern("MM-dd-yyyy HH:mm:ss"))
+  }
+
 }
 
 

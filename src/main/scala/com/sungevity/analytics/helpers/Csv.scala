@@ -51,7 +51,7 @@ object Csv {
       ("Performance ratio", performanceRatio),
       ("Count", count),
       ("Open Case", openCase),
-      ("System Performance Notes", ""),
+      ("System Performance Notes", pgNotes),
       ("PG Void", pgVoid),
       ("Interconnection Date", interconnectionDate),
       ("Neighborhood performance ratio", neighbourhoodPerformanceRatio),

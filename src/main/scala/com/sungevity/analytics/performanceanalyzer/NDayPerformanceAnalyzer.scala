@@ -7,7 +7,6 @@ import com.sungevity.analytics.helpers.Cassandra
 import com.sungevity.analytics.helpers.rest.PriceEngine
 import com.sungevity.analytics.model._
 import com.sungevity.analytics.utils.IOUtils
-import org.apache.spark.Accumulator
 import org.joda.time.DateTime
 
 import com.github.nscala_time.time.Imports._
@@ -17,6 +16,20 @@ import com.sungevity.analytics.utils.Date._
 import com.sungevity.analytics.utils.Statistics._
 import com.sungevity.analytics.utils.Spark._
 import org.slf4j.LoggerFactory
+
+object NDayPerformanceAnalyzerUtils {
+
+  def dailyAvg( day: DateTime, monthlyAvg: Seq[Double]) = {
+
+    def avgMonthlyKWh(date: DateTime) = monthlyAvg(date.getMonthOfYear - 1) / date.dayOfMonth().getMaximumValue
+
+    val days = ((day - 15.days) dateRange ((day + 14.days), 1 day)).toList
+
+    (((day - 15.days) dateRange ((day + 14.days), 1 day)) map (avgMonthlyKWh) sum) / 30
+
+  }
+
+}
 
 class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerContext] {
 
@@ -104,11 +117,7 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
           day =>
 
-            def avgMonthlyKWh(date: DateTime) = monthlyOutput(date.getMonthOfYear - 1) / date.dayOfMonth().getMaximumValue.toDouble
-
-            val dayAvgKwh = ((avgMonthlyKWh((day - 15.days)) * 15d + avgMonthlyKWh((day + 15.days)) * 15d) / 30d)
-
-            dayAvgKwh
+            NDayPerformanceAnalyzerUtils.dailyAvg(day, monthlyOutput)
 
         }
 
