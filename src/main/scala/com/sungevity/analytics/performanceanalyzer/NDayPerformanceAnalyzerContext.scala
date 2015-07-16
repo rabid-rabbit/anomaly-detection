@@ -1,7 +1,7 @@
 package com.sungevity.analytics.performanceanalyzer
 
 import com.github.nscala_time.time.Imports._
-import com.sungevity.analytics.SparkApplicationContext
+import com.sungevity.analytics.api.SparkApplicationContext
 import com.typesafe.config.Config
 import org.joda.time.{DateTime, Period}
 
@@ -11,7 +11,7 @@ import com.sungevity.analytics.utils.Date._
 
 class NDayPerformanceAnalyzerContext(config: Config) extends SparkApplicationContext(config) {
 
-  val applicationName = "NDayPerformanceAnalyzer"
+  def applicationName = "NDayPerformanceAnalyzer"
 
   val nDays = config.getInt("nday-performance-analyzer.input.range")
 

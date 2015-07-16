@@ -1,4 +1,4 @@
-package com.sungevity.analytics.helpers.rest
+package com.sungevity.analytics.services.rest
 
 import akka.actor.ActorSystem
 import com.sungevity.analytics.model.{ProductionEstimation, PEResponse, Account, PERequest}
@@ -16,7 +16,7 @@ object PriceEngine {
 
   val log = LoggerFactory.getLogger(getClass.getName)
 
-  import com.sungevity.analytics.helpers.rest.protocols.PriceEngine._
+  import com.sungevity.analytics.services.rest.protocols.PriceEngine._
 
   lazy implicit val system = ActorSystem()
 

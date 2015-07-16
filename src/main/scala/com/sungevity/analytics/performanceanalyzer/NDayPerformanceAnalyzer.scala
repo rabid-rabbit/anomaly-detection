@@ -1,12 +1,9 @@
 package com.sungevity.analytics.performanceanalyzer
 
-import java.nio.file.StandardOpenOption
 
-import com.sungevity.analytics.SparkApplication
 import com.sungevity.analytics.helpers.Cassandra
-import com.sungevity.analytics.helpers.rest.PriceEngine
+import com.sungevity.analytics.services.rest.PriceEngine
 import com.sungevity.analytics.model._
-import com.sungevity.analytics.utils.IOUtils
 import org.joda.time.DateTime
 
 import com.github.nscala_time.time.Imports._
@@ -31,25 +28,29 @@ object NDayPerformanceAnalyzerUtils {
 
 }
 
-class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerContext] {
+class NDayPerformanceAnalyzer {
 
   val log = LoggerFactory.getLogger(getClass.getName)
 
-  override def run(context: NDayPerformanceAnalyzerContext) {
+  def run(context: NDayPerformanceAnalyzerContext) = {
 
-    val sources = new NDayPerformanceAnalyzerDataSources(context)
+    val priceEngineEmptyResponses = context.sc.accumulator(0, "PE empty responses")
 
-    val priceEngineEmptyResponses = sources.sc.accumulator(0, "PE empty responses")
+    val accountsNumber = context.sc.accumulator(0, "Accounts")
 
-    val accountsNumber = sources.sc.accumulator(0, "Accounts")
+    val reportsNumber = context.sc.accumulator(0, "Reports")
 
-    val reportsNumber = sources.sc.accumulator(0, "Reports")
+    val finalReportsNumber = context.sc.accumulator(0, "Final Reports")
 
-    val finalReportsNumber = sources.sc.accumulator(0, "Final Reports")
+    val allSystemsData = context.dataSources.allSystemsData
+
+    val systemData = context.dataSources.systemData(context.startDate, context.endDate, context.nDays)
+
+    val productionData = context.dataSources.productionData(context.startDate, context.endDate)
 
     val accounts = {
 
-      val accounts = sources.allSystemsData.map {
+      val accounts = allSystemsData.map {
         row =>
 
           val byName = row.byName
@@ -127,7 +128,7 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
     val reports = {
 
-      val reports = sources.systemData.join(sources.productionData, sources.productionData("accountNumber") === sources.systemData("accountNumber"), "inner") flatMap {
+      val reports = systemData.join(productionData, productionData("accountNumber") === systemData("accountNumber"), "inner") flatMap {
         row =>
 
           val byName = row.byName
@@ -239,17 +240,16 @@ class NDayPerformanceAnalyzer extends SparkApplication[NDayPerformanceAnalyzerCo
 
       }) persist
 
-    import com.sungevity.analytics.helpers.Csv._
+    import com.sungevity.analytics.helpers.csv.Csv._
 
-    finalReports.repartition(10).toLocalIterator.asCSV.foreach {
-      line =>
-        IOUtils.write(context.outputPath, s"$line\n", StandardOpenOption.APPEND, StandardOpenOption.CREATE)
-    }
+    val results = finalReports.repartition(10).toLocalIterator.asCSV.map(_ + "\n")
 
     Seq(priceEngineEmptyResponses, accountsNumber, reportsNumber, finalReportsNumber).foreach {
       acc =>
-        log.info(s"${acc.name.getOrElse("Unknown Accumulator")}: [${acc.value}]")
+        println(s"${acc.name.getOrElse("Unknown Accumulator")}: [${acc.value}]")
     }
+
+    results
 
   }
 

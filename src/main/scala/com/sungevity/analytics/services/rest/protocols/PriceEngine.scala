@@ -1,4 +1,4 @@
-package com.sungevity.analytics.helpers.rest.protocols
+package com.sungevity.analytics.services.rest.protocols
 
 import com.sungevity.analytics.model._
 import spray.json._

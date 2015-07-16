@@ -18,6 +18,8 @@ libraryDependencies ++= Seq(
   "com.github.nscala-time" %% "nscala-time" % "2.0.0",
   "org.scalanlp" % "breeze_2.10" % "0.11.2",
   "org.apache.commons" % "commons-lang3" % "3.4",
+  "org.scalaz" %% "scalaz-core" % "7.1.3",
+  "com.sungevity.analytics" %% "apollo-toolkit" % "1.0.+",
   "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test"
 )
 

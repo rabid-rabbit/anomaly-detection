@@ -1,5 +1,6 @@
 package com.sungevity.analytics.model
 
+import com.sungevity.analytics.helpers.csv.Csv.Reportable
 import org.joda.time.DateTime
 
 import com.sungevity.analytics.helpers.Date._
@@ -21,7 +22,33 @@ case class Report(account: Account,
                   neighbourhoodPerformanceRatio: Double,
                   neighbourhoodStdDev: Double,
                   neighbourhoodDevAvg: Double,
-                  zScore: Double) {
+                  zScore: Double) extends Reportable {
+
+  override def cells: Iterable[(String, Any)] = Vector(
+    ("Account Number", account.accountID),
+    ("Name", account.name),
+    ("State", account.location.state),
+    ("Latitude", account.location.latitude),
+    ("Longitude", account.location.longitude),
+    ("Actual kWh", actualKwh),
+    ("Est kWh", estimatedKwh),
+    ("Performance ratio", performanceRatio),
+    ("Count", count),
+    ("Open Case", openCase),
+    ("System Performance Notes", pgNotes),
+    ("PG Void", pgVoid),
+    ("Interconnection Date", interconnectionDate),
+    ("Neighborhood performance ratio", neighbourhoodPerformanceRatio),
+    ("Neighborhood standard dev", neighbourhoodStdDev),
+    ("Deviation from neighborhood average", neighbourhoodDevAvg),
+    ("Z Score", zScore),
+    ("Sum", readimgsSum),
+    ("Blanks", blanksCount),
+    ("<=1", smallValuesCount)
+  ) ++ readings.map{
+    r =>
+      (reportDateFormat.print(r.readingDate), r.reading)
+  }
 
   override def toString(): String = {
     s"account = [$account]," +
