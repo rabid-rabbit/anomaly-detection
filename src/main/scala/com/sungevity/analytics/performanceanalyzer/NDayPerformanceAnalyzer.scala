@@ -1,52 +1,45 @@
 package com.sungevity.analytics.performanceanalyzer
 
-
-import com.sungevity.analytics.helpers.Cassandra
+import com.datastax.spark.connector.cql.CassandraConnector
 import com.sungevity.analytics.services.rest.PriceEngine
 import com.sungevity.analytics.model._
+import com.sungevity.analytics.api.SparkApplication
+import com.sungevity.analytics.helpers.Cassandra
+import com.typesafe.config.Config
+
 import org.joda.time.DateTime
 
+import com.sungevity.analytics.api.SparkApplication._
 import com.github.nscala_time.time.Imports._
-
 import com.sungevity.analytics.utils.Cassandra._
 import com.sungevity.analytics.utils.Date._
 import com.sungevity.analytics.utils.Statistics._
 import com.sungevity.analytics.utils.Spark._
-import org.slf4j.LoggerFactory
 
-object NDayPerformanceAnalyzerUtils {
+class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerformanceAnalyzerContext, Iterator[String]](config) {
 
-  def dailyAvg( day: DateTime, monthlyAvg: Seq[Double]) = {
-
-    def avgMonthlyKWh(date: DateTime) = monthlyAvg(date.getMonthOfYear - 1) / date.dayOfMonth().getMaximumValue
-
-    val days = ((day - 15.days) dateRange ((day + 14.days), 1 day)).toList
-
-    (((day - 15.days) dateRange ((day + 14.days), 1 day)) map (avgMonthlyKWh) sum) / 30
-
+  CassandraConnector(applicationContext.conf).withSessionDo { session =>
+    session.execute(s"CREATE KEYSPACE IF NOT EXISTS ${Cassandra.keyspaceName} WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
+    session.execute(s"CREATE TABLE IF NOT EXISTS ${Cassandra.keyspaceName}.est_monthly_kwh (accountID VARCHAR PRIMARY KEY, estimates LIST<INT>)")
   }
 
-}
+  override def initializeApplicationContext(config: Config): NDayPerformanceAnalyzerContext = new NDayPerformanceAnalyzerContext(config)
 
-class NDayPerformanceAnalyzer {
+  override def run(applicationContext: NDayPerformanceAnalyzerContext): Iterator[String] = {
 
-  val log = LoggerFactory.getLogger(getClass.getName)
+    val priceEngineEmptyResponses = applicationContext.sc.accumulator(0, "PE empty responses")
 
-  def run(context: NDayPerformanceAnalyzerContext) = {
+    val accountsNumber = applicationContext.sc.accumulator(0, "Accounts")
 
-    val priceEngineEmptyResponses = context.sc.accumulator(0, "PE empty responses")
+    val reportsNumber = applicationContext.sc.accumulator(0, "Reports")
 
-    val accountsNumber = context.sc.accumulator(0, "Accounts")
+    val finalReportsNumber = applicationContext.sc.accumulator(0, "Final Reports")
 
-    val reportsNumber = context.sc.accumulator(0, "Reports")
+    val allSystemsData = applicationContext.dataSources.allSystemsData
 
-    val finalReportsNumber = context.sc.accumulator(0, "Final Reports")
+    val systemData = applicationContext.dataSources.systemData(applicationContext.startDate, applicationContext.endDate, applicationContext.nDays)
 
-    val allSystemsData = context.dataSources.allSystemsData
-
-    val systemData = context.dataSources.systemData(context.startDate, context.endDate, context.nDays)
-
-    val productionData = context.dataSources.productionData(context.startDate, context.endDate)
+    val productionData = applicationContext.dataSources.productionData(applicationContext.startDate, applicationContext.endDate)
 
     val accounts = {
 
@@ -94,7 +87,7 @@ class NDayPerformanceAnalyzer {
     val estimatedMonthlyKwh = Cassandra.keyspaceName.getOrElse(accounts, "est_monthly_kwh", (a: Account) => a.accountID) {
       account =>
 
-        val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account), context.requestMaxLatency)
+        val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account), applicationContext.requestMaxLatency)
 
         if (result.response.isEmpty) {
           priceEngineEmptyResponses += 1
@@ -114,7 +107,7 @@ class NDayPerformanceAnalyzer {
 
         val monthlyOutput = estimates._2.map(_.toDouble)
 
-        val dailyEstimates = context.startDate.dateRange(context.endDate, new Period().withDays(1)) map {
+        val dailyEstimates = applicationContext.startDate.dateRange(applicationContext.endDate, new Period().withDays(1)) map {
 
           day =>
 
@@ -168,7 +161,7 @@ class NDayPerformanceAnalyzer {
 
           (group._1 -> report.copy(
             readimgsSum = report.readings.map(_.reading).sum,
-            blanksCount = context.days.length - report.readings.length,
+            blanksCount = applicationContext.days.length - report.readings.length,
             smallValuesCount = report.readings.map(v => if (v.reading <= 1) 1 else 0).sum
           ))
 
@@ -189,7 +182,7 @@ class NDayPerformanceAnalyzer {
 
     }
 
-    val persistedReports = context.sampleFraction match {
+    val persistedReports = applicationContext.sampleFraction match {
       case Some(fraction) => reports sample (false, fraction) persist
       case None => reports persist
     }
@@ -213,7 +206,7 @@ class NDayPerformanceAnalyzer {
 
       accountsWithDistances reduceByKey {
         (distanceAndReportA, distanceAndReportB) =>
-          (distanceAndReportA ++ distanceAndReportB).sortBy(_._1).take(context.nearestNeighbours)
+          (distanceAndReportA ++ distanceAndReportB).sortBy(_._1).take(applicationContext.nearestNeighbours)
       }
 
     }
@@ -250,7 +243,6 @@ class NDayPerformanceAnalyzer {
     }
 
     results
-
   }
 
 }

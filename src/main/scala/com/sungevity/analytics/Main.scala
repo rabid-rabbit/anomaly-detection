@@ -3,7 +3,7 @@ package com.sungevity.analytics
 import java.io.File
 
 import akka.actor.{Props, ActorSystem}
-import com.sungevity.analytics.performanceanalyzer.NDayPerformanceAnalyzerActor
+import com.sungevity.analytics.performanceanalyzer.NDayPerformanceAnalyzer
 import com.sungevity.analytics.utils.IOUtils
 import com.typesafe.config.ConfigFactory
 
@@ -28,6 +28,6 @@ object Main extends App {
 
   implicit val system = ActorSystem("AnomalyDetection", config)
 
-  val nDayPerformanceAnalyzer = system.actorOf(Props(new NDayPerformanceAnalyzerActor(config)), name = "nday-performance-analyzer")
+  val nDayPerformanceAnalyzer = system.actorOf(Props(new NDayPerformanceAnalyzer(config)), name = "nday-performance-analyzer")
 
 }
