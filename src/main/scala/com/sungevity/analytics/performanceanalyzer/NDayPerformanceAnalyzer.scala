@@ -1,22 +1,25 @@
 package com.sungevity.analytics.performanceanalyzer
 
+import java.nio.file.StandardOpenOption
+
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.sungevity.analytics.services.rest.PriceEngine
 import com.sungevity.analytics.model._
 import com.sungevity.analytics.api.SparkApplication
 import com.sungevity.analytics.helpers.Cassandra
+import com.sungevity.analytics.utils.IOUtils
 import com.typesafe.config.Config
 
 import org.joda.time.DateTime
 
-import com.sungevity.analytics.api.SparkApplication._
 import com.github.nscala_time.time.Imports._
 import com.sungevity.analytics.utils.Cassandra._
 import com.sungevity.analytics.utils.Date._
 import com.sungevity.analytics.utils.Statistics._
 import com.sungevity.analytics.utils.Spark._
 
-class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerformanceAnalyzerContext, Iterator[String]](config) {
+
+class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerformanceAnalyzerContext](config) {
 
   CassandraConnector(applicationContext.conf).withSessionDo { session =>
     session.execute(s"CREATE KEYSPACE IF NOT EXISTS ${Cassandra.keyspaceName} WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
@@ -25,7 +28,7 @@ class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerfo
 
   override def initializeApplicationContext(config: Config): NDayPerformanceAnalyzerContext = new NDayPerformanceAnalyzerContext(config)
 
-  override def run(applicationContext: NDayPerformanceAnalyzerContext): Iterator[String] = {
+  override def run(applicationContext: NDayPerformanceAnalyzerContext): Int = {
 
     val priceEngineEmptyResponses = applicationContext.sc.accumulator(0, "PE empty responses")
 
@@ -36,6 +39,15 @@ class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerfo
     val finalReportsNumber = applicationContext.sc.accumulator(0, "Final Reports")
 
     val allSystemsData = applicationContext.dataSources.allSystemsData
+
+    val estimatedPerformance = applicationContext.dataSources.estimatedPerformance.rdd.map{
+      row =>
+
+        val byName = row.byName
+
+        row.getString(byName("accountID")) -> (1 to 12).map(row.getDouble(_)).toSeq
+
+    }
 
     val systemData = applicationContext.dataSources.systemData(applicationContext.startDate, applicationContext.endDate, applicationContext.nDays)
 
@@ -84,23 +96,25 @@ class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerfo
 
     }
 
-    val estimatedMonthlyKwh = Cassandra.keyspaceName.getOrElse(accounts, "est_monthly_kwh", (a: Account) => a.accountID) {
-      account =>
+    val estimatedMonthlyKwh = accounts.map(account => account.accountID -> account).join(estimatedPerformance).map(_._2)
 
-        val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account), applicationContext.requestMaxLatency)
-
-        if (result.response.isEmpty) {
-          priceEngineEmptyResponses += 1
-        }
-
-        result.response.map(_.monthlyOutput).reduceOption{
-
-          (a, b) =>
-
-            a.zip(b).map(v => v._1 + v._2).toList
-
-        }
-    }
+//    val estimatedMonthlyKwh = Cassandra.keyspaceName.getOrElse(accounts, "est_monthly_kwh", (a: Account) => a.accountID) {
+//      account =>
+//
+//        val result = PriceEngine.monthlyKwh(PERequest("pvwattscontroller", "post", "getProductionEstimation", account), applicationContext.requestMaxLatency)
+//
+//        if (result.response.isEmpty) {
+//          priceEngineEmptyResponses += 1
+//        }
+//
+//        result.response.map(_.monthlyOutput).reduceOption{
+//
+//          (a, b) =>
+//
+//            a.zip(b).map(v => v._1 + v._2).toList
+//
+//        }
+//    }
 
     val estimatedDailyKwh = estimatedMonthlyKwh map {
       estimates =>
@@ -235,14 +249,21 @@ class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerfo
 
     import com.sungevity.analytics.helpers.csv.Csv._
 
-    val results = finalReports.repartition(10).toLocalIterator.asCSV.map(_ + "\n")
+    finalReports.repartition(10).toLocalIterator.asCSV.map(_ + "\n") foreach {
+
+      line =>
+
+        IOUtils.write(applicationContext.outputPath, line, StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+
+    }
 
     Seq(priceEngineEmptyResponses, accountsNumber, reportsNumber, finalReportsNumber).foreach {
       acc =>
         println(s"${acc.name.getOrElse("Unknown Accumulator")}: [${acc.value}]")
     }
 
-    results
+    0
+
   }
 
 }
