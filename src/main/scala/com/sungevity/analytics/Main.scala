@@ -32,6 +32,4 @@ object Main extends App {
 
   val actor = system.actorOf(Props(new NDayPerformanceAnalyzer(config)), "nday-performance-analyzer")
 
-  actor ! StartApplication
-
 }
