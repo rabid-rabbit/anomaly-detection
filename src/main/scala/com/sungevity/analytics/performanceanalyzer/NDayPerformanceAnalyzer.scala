@@ -16,12 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerformanceAnalyzerContext](config) with ScheduledApplication with HDFSShare {
 
-//  CassandraConnector(applicationContext.conf).withSessionDo { session =>
-//    session.execute(s"CREATE KEYSPACE IF NOT EXISTS ${Cassandra.keyspaceName} WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1 }")
-//    session.execute(s"CREATE TABLE IF NOT EXISTS ${Cassandra.keyspaceName}.est_monthly_kwh (accountID VARCHAR PRIMARY KEY, estimates LIST<INT>)")
-//  }
-
-  schedule("0/10 * * * * ?").recover{
+  schedule(applicationContext.config.getString("nday-performance-analyzer.schedule")).recover{
     case t: Throwable => applicationContext.log.error(s"Could not schedule ${applicationContext.applicationName}", t)
   }
 
@@ -30,12 +25,6 @@ class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerfo
   override def run(applicationContext: NDayPerformanceAnalyzerContext): Int = {
 
     publish(DateTimeFormat.forPattern("MM-dd-yyyy").print(DateTime.now) + ".csv", true) {
-      applicationContext.sc.parallelize(Seq("1, 2, 3"))
-    }
-
-    publish(DateTimeFormat.forPattern("MM-dd-yyyy").print(DateTime.now) + ".csv", true) {
-
-      val priceEngineEmptyResponses = applicationContext.sc.accumulator(0, "PE empty responses")
 
       val accountsNumber = applicationContext.sc.accumulator(0, "Accounts")
 
@@ -236,7 +225,7 @@ class NDayPerformanceAnalyzer(config: Config) extends SparkApplication[NDayPerfo
 
       import com.sungevity.analytics.helpers.csv.Csv._
 
-      Seq(priceEngineEmptyResponses, accountsNumber, reportsNumber, finalReportsNumber).foreach {
+      Seq(accountsNumber, reportsNumber, finalReportsNumber).foreach {
         acc =>
           println(s"${acc.name.getOrElse("Unknown Accumulator")}: [${acc.value}]")
       }

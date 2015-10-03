@@ -12,7 +12,7 @@ import com.typesafe.config.ConfigFactory
 object Main extends App {
 
   def help() {
-    println(s"\nUsage: ${this.getClass.getName} <command> <configuration file>\n")
+    println(s"\nUsage: ${this.getClass.getName} <configuration file>\n")
   }
 
   if (args.length < 1) {
